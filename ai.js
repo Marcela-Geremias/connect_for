@@ -1,56 +1,82 @@
-// Função de Avaliação
-function evaluateBoard(board) {
-    // Avaliação simples com base nas possíveis vitórias do jogador
-    return 0;
+// Variáveis Globais
+const ROWS = 7;
+const COLS = 8;
+let board;
+let currentPlayer;
+let aiPlayer = 'O';
+let humanPlayer = 'X';
+let selectedAlgorithm;
+let searchDepth;
+
+// Iniciar o Jogo
+function startGame() {
+    board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    currentPlayer = humanPlayer;
+    selectedAlgorithm = document.getElementById('algorithm').value;
+    searchDepth = parseInt(document.getElementById('depth').value);
+    renderBoard();
 }
 
-// Algoritmo Minimax
-function minimax(board, depth, isMaximizing) {
-    if (depth === 0 || checkWinCondition()) {
-        return evaluateBoard(board);
-    }
+// Renderizar o Tabuleiro
+function renderBoard() {
+    const boardDiv = document.getElementById("board");
+    boardDiv.innerHTML = "";
+    for (let row = 0; row < ROWS; row++) {
+        for (let col = 0; col < COLS; col++) {
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
 
-    let bestValue = isMaximizing ? -Infinity : Infinity;
-    for (let col = 0; col < COLS; col++) {
-        // Realizar uma cópia do estado atual e simular uma jogada
-        const newBoard = makeMoveOnCopy(board, col, isMaximizing ? 'X' : 'O');
-        const value = minimax(newBoard, depth - 1, !isMaximizing);
-        bestValue = isMaximizing ? Math.max(bestValue, value) : Math.min(bestValue, value);
-    }
-    return bestValue;
-}
+            // Define a cor da célula com base no jogador
+            if (board[row][col] === humanPlayer) {
+                cell.style.backgroundColor = "red"; // Bolinha vermelha para o jogador humano
+            } else if (board[row][col] === aiPlayer) {
+                cell.style.backgroundColor = "yellow"; // Bolinha amarela para a IA
+            } else {
+                cell.style.backgroundColor = "white"; // Células vazias em branco
+                cell.addEventListener("click", () => {
+                    if (currentPlayer === humanPlayer) makeMove(col);
+                });
+            }
 
-// Algoritmo de Poda Alfa-Beta
-function minimaxAlphaBeta(board, depth, alpha, beta, isMaximizing) {
-    if (depth === 0 || checkWinCondition()) {
-        return evaluateBoard(board);
-    }
-
-    let bestValue = isMaximizing ? -Infinity : Infinity;
-    for (let col = 0; col < COLS; col++) {
-        const newBoard = makeMoveOnCopy(board, col, isMaximizing ? 'X' : 'O');
-        const value = minimaxAlphaBeta(newBoard, depth - 1, alpha, beta, !isMaximizing);
-        
-        if (isMaximizing) {
-            bestValue = Math.max(bestValue, value);
-            alpha = Math.max(alpha, bestValue);
-        } else {
-            bestValue = Math.min(bestValue, value);
-            beta = Math.min(beta, bestValue);
+            boardDiv.appendChild(cell);
         }
-
-        if (beta <= alpha) break; // Poda
     }
-    return bestValue;
 }
 
-function makeMoveOnCopy(board, col, player) {
-    const newBoard = board.map(row => row.slice());
+// Fazer Jogada
+function makeMove(col) {
     for (let row = ROWS - 1; row >= 0; row--) {
-        if (!newBoard[row][col]) {
-            newBoard[row][col] = player;
-            break;
+        if (!board[row][col]) {
+            board[row][col] = currentPlayer;
+            renderBoard();
+            if (checkWin(row, col)) {
+                alert(`${currentPlayer} Wins!`);
+                startGame();
+                return;
+            } else if (board.flat().every(cell => cell)) {
+                alert("It's a Draw!");
+                startGame();
+                return;
+            } else {
+                currentPlayer = currentPlayer === humanPlayer ? aiPlayer : humanPlayer;
+                if (currentPlayer === aiPlayer) makeAiMove();
+            }
+            return;
         }
     }
-    return newBoard;
+    alert("Column is full!");
+}
+
+// Função de Jogada da IA
+function makeAiMove() {
+    let bestMove;
+    if (selectedAlgorithm === "minimax") {
+        bestMove = getBestMoveMinimax();
+    } else if (selectedAlgorithm === "alphabeta") {
+        bestMove = getBestMoveAlphaBeta();
+    }
+
+    if (bestMove !== undefined) {
+        makeMove(bestMove);
+    }
 }
