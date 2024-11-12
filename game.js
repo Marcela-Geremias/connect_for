@@ -48,13 +48,19 @@ function makeMove(col) {
         if (!board[row][col]) {
             board[row][col] = currentPlayer;
             renderBoard();
+
             if (checkWin(row, col)) {
-                alert(`${currentPlayer === humanPlayer ? "Você venceu!" : "A IA venceu!"}`);
-                startGame();
+                // Aguarda 500 ms antes de exibir o alerta, para garantir que o movimento final é exibido
+                setTimeout(() => {
+                    alert(`${currentPlayer === humanPlayer ? "Você venceu!" : "A IA venceu!"}`);
+                    startGame();
+                }, 500);
                 return;
             } else if (board.flat().every(cell => cell)) {
-                alert("O jogo terminou em empate!");
-                startGame();
+                setTimeout(() => {
+                    alert("O jogo terminou em empate!");
+                    startGame();
+                }, 500);
                 return;
             } else {
                 currentPlayer = currentPlayer === humanPlayer ? aiPlayer : humanPlayer;
@@ -70,12 +76,16 @@ function makeMove(col) {
 
 // Função de Jogada da IA
 function makeAiMove() {
+    console.time("Tempo de execução da IA");
+
     let bestMove;
     if (selectedAlgorithm === "minimax") {
         bestMove = getBestMoveMinimax(board, searchDepth, true);
     } else if (selectedAlgorithm === "alphabeta") {
         bestMove = getBestMoveAlphaBeta(board, searchDepth, -Infinity, Infinity, true);
     }
+
+    console.timeEnd("Tempo de execução da IA");
 
     if (bestMove !== undefined) {
         makeMove(bestMove);
@@ -129,13 +139,14 @@ function getBestMoveMinimax(board, depth, isMaximizingPlayer) {
         return evaluateBoard(board);
     }
 
-    let bestMove;
+    let bestMove = null;
     let bestScore = isMaximizingPlayer ? -Infinity : Infinity;
 
     for (let col = 0; col < COLS; col++) {
         const tempBoard = makeTempMove(board, col, isMaximizingPlayer ? aiPlayer : humanPlayer);
         if (tempBoard) {
             const score = getBestMoveMinimax(tempBoard, depth - 1, !isMaximizingPlayer);
+
             if (isMaximizingPlayer) {
                 if (score > bestScore) {
                     bestScore = score;
@@ -149,7 +160,7 @@ function getBestMoveMinimax(board, depth, isMaximizingPlayer) {
             }
         }
     }
-    return bestMove;
+    return depth === searchDepth ? bestMove : bestScore;
 }
 
 // Função Alfa-Beta
@@ -158,11 +169,13 @@ function getBestMoveAlphaBeta(board, depth, alpha, beta, isMaximizingPlayer) {
         return evaluateBoard(board);
     }
 
-    let bestMove;
+    let bestMove = null;
+
     for (let col = 0; col < COLS; col++) {
         const tempBoard = makeTempMove(board, col, isMaximizingPlayer ? aiPlayer : humanPlayer);
         if (tempBoard) {
             const score = getBestMoveAlphaBeta(tempBoard, depth - 1, alpha, beta, !isMaximizingPlayer);
+
             if (isMaximizingPlayer) {
                 if (score > alpha) {
                     alpha = score;
@@ -178,8 +191,9 @@ function getBestMoveAlphaBeta(board, depth, alpha, beta, isMaximizingPlayer) {
             }
         }
     }
-    return bestMove;
+    return depth === searchDepth ? bestMove : (isMaximizingPlayer ? alpha : beta);
 }
+
 
 // Helper para verificar se o tabuleiro está cheio
 function isBoardFull(board) {
@@ -231,3 +245,5 @@ function checkWin(row, col) {
     }
     return false;
 }
+
+startGame();  // Começar o jogo
