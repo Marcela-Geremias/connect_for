@@ -1,6 +1,8 @@
+
+
 // Variáveis Globais
-const ROWS = 7;
-const COLS = 8;
+const ROWS = 6; // Número de linhas no tabuleiro
+const COLS = 7; // Número de colunas no tabuleiro
 let board;
 let currentPlayer;
 let aiPlayer = 'O';
@@ -12,8 +14,8 @@ let searchDepth;
 function startGame() {
     board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     currentPlayer = humanPlayer;
-    selectedAlgorithm = document.getElementById('algorithm').value;
-    searchDepth = parseInt(document.getElementById('depth').value);
+    selectedAlgorithm = document.getElementById('algorithm').value || "minimax";
+    searchDepth = parseInt(document.getElementById('depth').value) || 4;
     renderBoard();
 }
 
@@ -21,17 +23,27 @@ function startGame() {
 function renderBoard() {
     const boardDiv = document.getElementById("board");
     boardDiv.innerHTML = "";
+    boardDiv.style.display = "grid";
+    boardDiv.style.gridTemplateRows = `repeat(${ROWS}, 50px)`;
+    boardDiv.style.gridTemplateColumns = `repeat(${COLS}, 50px)`;
+    boardDiv.style.gap = "2px";
+
     for (let row = 0; row < ROWS; row++) {
         for (let col = 0; col < COLS; col++) {
             const cell = document.createElement("div");
             cell.classList.add("cell");
+            cell.style.width = "50px";
+            cell.style.height = "50px";
+            cell.style.border = "1px solid black";
+            cell.style.display = "flex";
+            cell.style.justifyContent = "center";
+            cell.style.alignItems = "center";
+            cell.style.fontSize = "24px";
+            cell.style.cursor = "pointer";
+            cell.style.backgroundColor = board[row][col] === humanPlayer ? "red" : 
+                                         board[row][col] === aiPlayer ? "yellow" : "white";
 
-            if (board[row][col] === humanPlayer) {
-                cell.classList.add("red");
-            } else if (board[row][col] === aiPlayer) {
-                cell.classList.add("yellow");
-            } else {
-                cell.style.backgroundColor = "white";
+            if (!board[row][col]) {
                 cell.addEventListener("click", () => {
                     if (currentPlayer === humanPlayer) makeMove(col);
                 });
@@ -42,6 +54,20 @@ function renderBoard() {
     }
 }
 
+// Código de teste no mesmo arquivo script.js
+function testPerformance(board, depth) {
+    console.log("==== Testando Minimax ====");
+    console.time(`Minimax Depth ${depth}`);
+    getBestMoveMinimax(board, depth, true);
+    console.timeEnd(`Minimax Depth ${depth}`);
+
+    console.log("==== Testando Poda Alfa-Beta ====");
+    console.time(`Alpha-Beta Depth ${depth}`);
+    getBestMoveAlphaBeta(board, depth, -Infinity, Infinity, true);
+    console.timeEnd(`Alpha-Beta Depth ${depth}`);
+}
+
+
 // Fazer Jogada
 function makeMove(col) {
     for (let row = ROWS - 1; row >= 0; row--) {
@@ -50,13 +76,12 @@ function makeMove(col) {
             renderBoard();
 
             if (checkWin(row, col)) {
-                // Aguarda 500 ms antes de exibir o alerta, para garantir que o movimento final é exibido
                 setTimeout(() => {
                     alert(`${currentPlayer === humanPlayer ? "Você venceu!" : "A IA venceu!"}`);
                     startGame();
                 }, 500);
                 return;
-            } else if (board.flat().every(cell => cell)) {
+            } else if (isBoardFull(board)) {
                 setTimeout(() => {
                     alert("O jogo terminou em empate!");
                     startGame();
@@ -65,7 +90,7 @@ function makeMove(col) {
             } else {
                 currentPlayer = currentPlayer === humanPlayer ? aiPlayer : humanPlayer;
                 if (currentPlayer === aiPlayer) {
-                    setTimeout(makeAiMove, 500); // Atraso para a jogada da IA
+                    setTimeout(makeAiMove, 500);
                 }
             }
             return;
@@ -74,7 +99,7 @@ function makeMove(col) {
     alert("A coluna está cheia!");
 }
 
-// Função de Jogada da IA
+// Jogada da IA
 function makeAiMove() {
     console.time("Tempo de execução da IA");
 
@@ -92,25 +117,23 @@ function makeAiMove() {
     }
 }
 
-// Função de Avaliação
+// Função de Avaliação do Tabuleiro
 function evaluateBoard(board) {
     let score = 0;
 
-    // Função para avaliar segmentos de 4 células
     function evaluateSegment(segment) {
-        let score = 0;
         const countAI = segment.filter(cell => cell === aiPlayer).length;
         const countHuman = segment.filter(cell => cell === humanPlayer).length;
 
-        if (countAI === 4) score += 100;
-        else if (countAI === 3 && countHuman === 0) score += 10;
-        else if (countAI === 2 && countHuman === 0) score += 5;
-        else if (countHuman === 3 && countAI === 0) score -= 80;
-        
-        return score;
+        if (countAI === 4) return 1000;
+        if (countHuman === 4) return -1000;
+        if (countAI === 3 && countHuman === 0) return 50;
+        if (countHuman === 3 && countAI === 0) return -50;
+        if (countAI === 2 && countHuman === 0) return 10;
+        if (countHuman === 2 && countAI === 0) return -10;
+        return 0;
     }
 
-    // Avaliar linhas, colunas e diagonais
     for (let row = 0; row < ROWS; row++) {
         for (let col = 0; col < COLS - 3; col++) {
             score += evaluateSegment([board[row][col], board[row][col + 1], board[row][col + 2], board[row][col + 3]]);
@@ -133,41 +156,28 @@ function evaluateBoard(board) {
     return score;
 }
 
-// Função Minimax
+// Minimax e Alfa-Beta Implementações
 function getBestMoveMinimax(board, depth, isMaximizingPlayer) {
-    if (depth === 0 || checkWin() || isBoardFull(board)) {
-        return evaluateBoard(board);
-    }
+    if (depth === 0 || isBoardFull(board)) return evaluateBoard(board);
 
-    let bestMove = null;
     let bestScore = isMaximizingPlayer ? -Infinity : Infinity;
+    let bestMove = null;
 
     for (let col = 0; col < COLS; col++) {
         const tempBoard = makeTempMove(board, col, isMaximizingPlayer ? aiPlayer : humanPlayer);
         if (tempBoard) {
             const score = getBestMoveMinimax(tempBoard, depth - 1, !isMaximizingPlayer);
-
-            if (isMaximizingPlayer) {
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMove = col;
-                }
-            } else {
-                if (score < bestScore) {
-                    bestScore = score;
-                    bestMove = col;
-                }
+            if (isMaximizingPlayer ? score > bestScore : score < bestScore) {
+                bestScore = score;
+                bestMove = col;
             }
         }
     }
     return depth === searchDepth ? bestMove : bestScore;
 }
 
-// Função Alfa-Beta
 function getBestMoveAlphaBeta(board, depth, alpha, beta, isMaximizingPlayer) {
-    if (depth === 0 || checkWin() || isBoardFull(board)) {
-        return evaluateBoard(board);
-    }
+    if (depth === 0 || isBoardFull(board)) return evaluateBoard(board);
 
     let bestMove = null;
 
@@ -194,13 +204,11 @@ function getBestMoveAlphaBeta(board, depth, alpha, beta, isMaximizingPlayer) {
     return depth === searchDepth ? bestMove : (isMaximizingPlayer ? alpha : beta);
 }
 
-
-// Helper para verificar se o tabuleiro está cheio
+// Helpers
 function isBoardFull(board) {
     return board.flat().every(cell => cell !== null);
 }
 
-// Helper para fazer jogada temporária
 function makeTempMove(board, col, player) {
     const newBoard = board.map(row => row.slice());
     for (let row = ROWS - 1; row >= 0; row--) {
@@ -212,13 +220,12 @@ function makeTempMove(board, col, player) {
     return null;
 }
 
-// Verificação de Vitória
 function checkWin(row, col) {
     const directions = [
-        { dr: 0, dc: 1 }, // Horizontal
-        { dr: 1, dc: 0 }, // Vertical
-        { dr: 1, dc: 1 }, // Diagonal para baixo-direita
-        { dr: 1, dc: -1 } // Diagonal para baixo-esquerda
+        { dr: 0, dc: 1 },
+        { dr: 1, dc: 0 },
+        { dr: 1, dc: 1 },
+        { dr: 1, dc: -1 }
     ];
 
     for (let { dr, dc } of directions) {
@@ -226,24 +233,47 @@ function checkWin(row, col) {
         for (let i = 1; i < 4; i++) {
             const r = row + dr * i;
             const c = col + dc * i;
-            if (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === currentPlayer) {
-                count++;
-            } else {
-                break;
-            }
+            if (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === currentPlayer) count++;
+            else break;
         }
         for (let i = 1; i < 4; i++) {
             const r = row - dr * i;
             const c = col - dc * i;
-            if (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === currentPlayer) {
-                count++;
-            } else {
-                break;
-            }
+            if (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === currentPlayer) count++;
+            else break;
         }
         if (count >= 4) return true;
     }
     return false;
 }
 
-startGame();  // Começar o jogo
+// Código de teste no mesmo arquivo script.js
+function testPerformance(board, depth) {
+    // Garantir que os testes são feitos separadamente
+    console.log("==== Iniciando Teste de Desempenho ====");
+
+    // Testando Minimax
+    if (selectedAlgorithm === "minimax") {
+        console.log("==== Testando Minimax ====");
+        console.time(`Minimax Depth ${depth}`);
+        const minimaxResult = getBestMoveMinimax(board, depth, true); // Rodando o Minimax
+        console.timeEnd(`Minimax Depth ${depth}`);
+        console.log("Resultado Minimax:", minimaxResult);
+    }
+
+    // Testando Poda Alfa-Beta
+    if (selectedAlgorithm === "alphabeta") {
+        console.log("==== Testando Poda Alfa-Beta ====");
+        console.time(`Alpha-Beta Depth ${depth}`);
+        const alphaBetaResult = getBestMoveAlphaBeta(board, depth, -Infinity, Infinity, true); // Rodando o Alpha-Beta
+        console.timeEnd(`Alpha-Beta Depth ${depth}`);
+        console.log("Resultado Poda Alfa-Beta:", alphaBetaResult);
+    }
+}
+
+// Definindo board para o teste
+const testBoard = Array.from({ length: 6 }, () => Array(7).fill(null)); // Tabuleiro de 6x7
+startGame();  // Iniciar o jogo
+
+selectedAlgorithm = "minimax"; // Pode ser "alphabeta" ou "minimax"
+testPerformance(testBoard, 3); // Testar com profundidade 3
